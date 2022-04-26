@@ -54,7 +54,7 @@ class Scalar2dDataWrapper:
         self.plot()
         plt.show()
 
-    def plot(self, x_every=10, y_every=2, x_interval=(0, -1), xticklabels=None, xlabel="", ylabel="", log=False):
+    def plot(self, x_every=10, y_every=2, x_interval=(0, -1), xticklabels=None, xlabel=None, ylabel=None, cbar_title=None, title=None, log=False):
         '''Takes (x,y,z) tuple of cleaned scalar visdom data and plots it in a heatmap.
 
                 Parameters:
@@ -67,10 +67,10 @@ class Scalar2dDataWrapper:
                     log (bool): view data in log-space.
         '''
 
-        yticklabels = self.y
-        yticklabels[::y_every] = ""
+        yticklabels= [""] * len(self.y)
+        yticklabels[1::y_every] = self.y[1::y_every]
         xticklabels_ = [""] * len(self.x)
-        xticklabels_[1::x_every] = xticklabels[1::x_every] if xticklabels else self.x[1::x_every]
+        xticklabels_[1::x_every] = xticklabels[1::x_every] if xticklabels is not None else self.x[1::x_every]
         xticklabels_ = xticklabels_[x_interval[0]:x_interval[1]]
 
         if log:
@@ -80,10 +80,10 @@ class Scalar2dDataWrapper:
 
         ax = sns.heatmap(np.flipud(z[:, x_interval[0]:x_interval[1]]),
                          xticklabels=xticklabels_, yticklabels=np.flipud(yticklabels))
-        ax.collections[0].colorbar.set_label(log*"log " + self.cbar_title)
+        ax.collections[0].colorbar.set_label(log*"log " + cbar_title if cbar_title else self.cbar_title )
         plt.xlabel(xlabel if xlabel else "step")
         plt.ylabel(ylabel)
-        plt.title(self.filename)
+        plt.title(title if title is not None else self.filename)
         plt.show()
 
     def size(self):
@@ -160,7 +160,16 @@ if __name__ == "__main__":
     # Example usage
 
     # Read and preprocess
-    l = read_and_preprocess("link_to_log_folder")
+    l = read_and_preprocess("/home/chris/workspace/loss-landscapes/logs_linearize/")
 
     # Use plot function for a single plot
-    l["name_of_training_run"]["name_of_visdom_plot"].plot(ylabel="layer", log=True, xlabel="epoch", y_every=2, x_interval=(5, 30))
+    depths = [6*i+2 for i in range(3,21,3)]
+    depths = [56]
+    for depth in depths:
+        #plt.plot(l["postrain_lr_0.005_rw_0.003_depth_"+str(depth)][" Proportion of disabled ReLUs per Layer"].z[:,-1], linestyle=' ', marker='x')
+        plt.plot(l["postrain_lr_0.005_rw_0.003_depth_"+str(depth)]["Histogram of path lengths"].z[:,::10])
+
+    plt.legend(depths)
+    plt.show()
+    #l["postrain_lr_0.005_rw_0.003_depth_56"]["Histogram of path lengths"].plot(ylabel="layer", log=False, xlabel="epoch", y_every=2)
+    breakpoint()
