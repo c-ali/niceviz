@@ -9,9 +9,9 @@ import seaborn as sns
 class ScalarDataWrapper:
     '''Wrapper for 2d plots'''
 
-    def __init__(self, list_x, list_y, y_label, filename, smooth_sigma=2):
-        self.x = np.array(list_x)
-        self.y = np.array(list_y)
+    def __init__(self, list_x, list_y, y_label, filename, smooth_sigma=0):
+        self.x = np.array(list_x, dtype=float)
+        self.y = np.array(list_y, dtype=float)
         if smooth_sigma > 0:
             self.y = ndimage.gaussian_filter1d(self.y, smooth_sigma)
         self.y_label = y_label
@@ -21,7 +21,7 @@ class ScalarDataWrapper:
         self.plot()
         plt.show()
 
-    def plot(self, x_interval=(0, -1),xticklabels = None):
+    def plot(self, x_interval=(0, -1), xticklabels=None):
         '''Takes (x,y) tuple of cleaned scalar visdom data and plots it.
 
                 Parameters:
@@ -54,7 +54,8 @@ class Scalar2dDataWrapper:
         self.plot()
         plt.show()
 
-    def plot(self, x_every=10, y_every=2, x_interval=(0, -1), xticklabels=None, xlabel=None, ylabel=None, cbar_title=None, title=None, log=False):
+    def plot(self, x_every=10, y_every=2, x_interval=(0, -1), xticklabels=None, yticklabels=None, xlabel=None,
+             ylabel=None, cbar_title=None, title=None, log=False, **kwargs):
         '''Takes (x,y,z) tuple of cleaned scalar visdom data and plots it in a heatmap.
 
                 Parameters:
@@ -67,8 +68,9 @@ class Scalar2dDataWrapper:
                     log (bool): view data in log-space.
         '''
 
-        yticklabels= [""] * len(self.y)
-        yticklabels[1::y_every] = self.y[1::y_every]
+        yticklabels_ = [""] * len(self.y)
+        yticklabels_[1::y_every] = yticklabels[1::y_every] if yticklabels is not None else self.y[1::y_every]
+
         xticklabels_ = [""] * len(self.x)
         xticklabels_[1::x_every] = xticklabels[1::x_every] if xticklabels is not None else self.x[1::x_every]
         xticklabels_ = xticklabels_[x_interval[0]:x_interval[1]]
@@ -79,12 +81,13 @@ class Scalar2dDataWrapper:
             z = self.z
 
         ax = sns.heatmap(np.flipud(z[:, x_interval[0]:x_interval[1]]),
-                         xticklabels=xticklabels_, yticklabels=np.flipud(yticklabels))
-        ax.collections[0].colorbar.set_label(log*"log " + cbar_title if cbar_title else self.cbar_title )
-        plt.xlabel(xlabel if xlabel else "step")
-        plt.ylabel(ylabel)
-        plt.title(title if title is not None else self.filename)
-        plt.show()
+                         xticklabels=xticklabels_, yticklabels=np.flipud(yticklabels_), **kwargs)
+        if cbar_title:
+            ax.collections[0].colorbar.set_label(log * "log " + cbar_title if cbar_title else self.cbar_title)
+        ax.set_xlabel(xlabel if xlabel else "step")
+        ax.set_ylabel(ylabel)
+        ax.set_title(title if title is not None else self.filename)
+        return ax
 
     def size(self):
         return len(self.y)
@@ -98,7 +101,6 @@ class JsonWrapper:
         self.__read_json(path)
         self.__extract_scalars()
         self.__clean_data()
-        pass
 
     def __getitem__(self, item):
         return self.data[item]
@@ -129,7 +131,7 @@ class JsonWrapper:
     def __clean_data(self):
         '''Removes all unnecessary entries in the dict.
         Returned dict contains name as key and a tuple of lists x[]/y[] as value'''
-        for key, value in self.data.items():
+        for key in self.data.keys():
             if "z" in self.data[key]["content"]["data"][0]:
                 self.data[key] = Scalar2dDataWrapper(self.data[key]["content"]["data"][0]["x"],
                                                      self.data[key]["content"]["data"][0]["y"],
@@ -143,15 +145,14 @@ def read_and_preprocess(folder_path):
     '''Reads and preprocesses all jsons in a folder indicated by folder_path.
     Returns a dict where keys are filenames and values are cleaned data-dicts.'''
     d_out = {}
-
     for filename in os.listdir(folder_path):
         filename_noext = os.path.splitext(filename)[0]
         full_path = os.path.join(folder_path, filename)
         try:
             data = JsonWrapper(full_path)
             d_out.update({filename_noext: data})
-        except:
-            "File " + full_path + " not valid json."
+        except Exception as e:
+            print(e)
 
     return d_out
 
@@ -163,13 +164,13 @@ if __name__ == "__main__":
     l = read_and_preprocess("/home/chris/workspace/loss-landscapes/logs_linearize/")
 
     # Use plot function for a single plot
-    depths = [6*i+2 for i in range(3,21,3)]
+    depths = [6 * i + 2 for i in range(3, 21, 3)]
     depths = [56]
     for depth in depths:
-        #plt.plot(l["postrain_lr_0.005_rw_0.003_depth_"+str(depth)][" Proportion of disabled ReLUs per Layer"].z[:,-1], linestyle=' ', marker='x')
-        plt.plot(l["postrain_lr_0.005_rw_0.003_depth_"+str(depth)]["Histogram of path lengths"].z[:,::10])
+        # plt.plot(l["postrain_lr_0.005_rw_0.003_depth_"+str(depth)][" Proportion of disabled ReLUs per Layer"].z[:,-1], linestyle=' ', marker='x')
+        plt.plot(l["postrain_lr_0.005_rw_0.003_depth_" + str(depth)]["Histogram of path lengths"].z[:, ::10])
 
     plt.legend(depths)
     plt.show()
-    #l["postrain_lr_0.005_rw_0.003_depth_56"]["Histogram of path lengths"].plot(ylabel="layer", log=False, xlabel="epoch", y_every=2)
+    # l["postrain_lr_0.005_rw_0.003_depth_56"]["Histogram of path lengths"].plot(ylabel="layer", log=False, xlabel="epoch", y_every=2)
     breakpoint()
